@@ -3,9 +3,9 @@ import yfinance as yf
 import plotly.graph_objects as go
 from streamlit_autorefresh import st_autorefresh
 
-# ----------------------------------
-# PAGE SETTINGS
-# ----------------------------------
+# ==========================================
+# CONFIG
+# ==========================================
 st.set_page_config(
     page_title="Real-Time Stock Tracker",
     page_icon="📈",
@@ -13,35 +13,23 @@ st.set_page_config(
 )
 
 # Auto refresh every 10 seconds
-st_autorefresh(interval=10000, key="stock_refresh")
+st_autorefresh(interval=10000, key="refresh")
 
-# ----------------------------------
+# ==========================================
 # HEADER
-# ----------------------------------
+# ==========================================
 st.title("📈 Real-Time Stock Tracker")
-st.markdown("Track your favourite stocks with live market data from Yahoo Finance.")
+st.write("Monitor your favourite stocks in real time.")
 
-# ----------------------------------
+# ==========================================
 # SIDEBAR
-# ----------------------------------
-st.sidebar.header("Watchlist")
-
-default_symbols = "AAPL,MSFT,NVDA,GOOGL,TSLA"
+# ==========================================
+st.sidebar.header("Stock Watchlist")
 
 symbols = st.sidebar.text_input(
     "Enter stock symbols (comma separated)",
-    default_symbols
+    "AAPL,MSFT,NVDA,GOOGL,TSLA"
 )
-
-refresh_rate = st.sidebar.slider(
-    "Refresh interval (seconds)",
-    min_value=5,
-    max_value=60,
-    value=10
-)
-
-# Apply chosen refresh interval
-st_autorefresh(interval=refresh_rate * 1000, key="custom_refresh")
 
 watchlist = [
     symbol.strip().upper()
@@ -49,10 +37,10 @@ watchlist = [
     if symbol.strip()
 ]
 
-# ----------------------------------
-# SUMMARY METRICS
-# ----------------------------------
-st.subheader("Market Overview")
+# ==========================================
+# TOP METRICS
+# ==========================================
+st.subheader("Market Snapshot")
 
 if watchlist:
 
@@ -64,22 +52,20 @@ if watchlist:
             stock = yf.Ticker(ticker)
             info = stock.fast_info
 
-            current_price = info.get("lastPrice")
-            previous_close = info.get("previousClose")
-            volume = info.get("lastVolume")
+            current_price = info.get("lastPrice", 0)
+            previous_close = info.get("previousClose", 0)
 
-            if current_price and previous_close:
-                pct_change = (
+            change_pct = 0
+            if previous_close:
+                change_pct = (
                     (current_price - previous_close)
                     / previous_close
                 ) * 100
-            else:
-                pct_change = 0
 
             cols[i % len(cols)].metric(
-                label=ticker,
-                value=f"${current_price:,.2f}",
-                delta=f"{pct_change:.2f}%"
+                ticker,
+                f"${current_price:,.2f}",
+                f"{change_pct:.2f}%"
             )
 
         except Exception:
@@ -87,9 +73,9 @@ if watchlist:
 
 st.divider()
 
-# ----------------------------------
-# DETAILED CHARTS
-# ----------------------------------
+# ==========================================
+# CHARTS
+# ==========================================
 for ticker in watchlist:
 
     try:
@@ -101,40 +87,22 @@ for ticker in watchlist:
         )
 
         if data.empty:
-            st.warning(f"No market data found for {ticker}")
+            st.warning(f"No data available for {ticker}")
             continue
 
-        latest_price = data["Close"].iloc[-1]
-        open_price = data["Open"].iloc[0]
-        high_price = data["High"].max()
-        low_price = data["Low"].min()
-        total_volume = int(data["Volume"].sum())
+        current_price = data["Close"].iloc[-1]
+        day_high = data["High"].max()
+        day_low = data["Low"].min()
+        volume = int(data["Volume"].sum())
 
-        st.subheader(f"📊 {ticker}")
+        st.subheader(f"{ticker}")
 
         c1, c2, c3, c4 = st.columns(4)
 
-        c1.metric(
-            "Current",
-            f"${latest_price:,.2f}"
-        )
-
-        c2.metric(
-            "Open",
-            f"${open_price:,.2f}"
-        )
-
-        c3.metric(
-            "High",
-            f"${high_price:,.2f}"
-        )
-
-        c4.metric(
-            "Low",
-            f"${low_price:,.2f}"
-        )
-
-        st.write(f"**Volume:** {total_volume:,}")
+        c1.metric("Current", f"${current_price:,.2f}")
+        c2.metric("High", f"${day_high:,.2f}")
+        c3.metric("Low", f"${day_low:,.2f}")
+        c4.metric("Volume", f"{volume:,}")
 
         fig = go.Figure()
 
@@ -151,10 +119,9 @@ for ticker in watchlist:
         fig.update_layout(
             title=f"{ticker} Intraday Price",
             xaxis_title="Time",
-            yaxis_title="Price (USD)",
+            yaxis_title="Price",
             template="plotly_white",
-            height=450,
-            margin=dict(l=20, r=20, t=50, b=20)
+            height=450
         )
 
         st.plotly_chart(
@@ -167,9 +134,7 @@ for ticker in watchlist:
     except Exception as e:
         st.error(f"{ticker}: {e}")
 
-# ----------------------------------
+# ==========================================
 # FOOTER
-# ----------------------------------
-st.caption(
-    f"Auto-refreshing every {refresh_rate} seconds | Powered by Yahoo Finance"
-)
+# ==========================================
+st.caption("Live market data powered by Yahoo Finance • Refreshes every 10 seconds")
